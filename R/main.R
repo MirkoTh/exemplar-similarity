@@ -2,6 +2,10 @@ library(tidyverse)
 library(docstring)
 library(MASS)
 
+
+l <- c("R/utils.R", "R/plotting.R")
+walk(l, source)
+
 # todos
 # 1. draw samples from the rough and the smooth functions
 # 1.1 create regions with high density and low density of training points
@@ -10,99 +14,6 @@ library(MASS)
 # 3. evaluate the kernel function for the intended test points
 # 4. feed the summed similarity measure into the linear ba model
 # 5. manually play around with the other parameters to achieve reasonable predictions
-
-
-xy_space <- function(fn, smoothness, x_range, seed, x_nudge = 1){
-  if (sum(x_range < 0) != 0 | !is.integer(x_range[1]) | !is.integer(x_range[2])) {
-    stop("only positive integers allowed in x range")
-  } 
-  x <- seq(x_range[1] + x_nudge, x_range[2] - x_nudge, by = 1)
-  tbl_x <- crossing(x1 = x, x2 = x)
-  tbl_x$y <- fn(tbl_x, seed, smoothness)
-  tbl_x$smoothness <- smoothness
-  return(tbl_x)
-}
-
-fn_sin <- function(tbl, seed, smoothness) {
-  if (smoothness == "smooth") {
-    scale <- 3
-  } else if (smoothness == "rough") {
-    scale <- 1
-  }
-  set.seed(seed)
-  shift_x <- runif(2, 0, 2*pi)
-  return(sin(tbl$x1 + shift_x[1]) / scale + sin(tbl$x2 + shift_x[2]) / scale)
-}
-
-xy_sample <- function(tbl_xy, n_train, n_centers, p_crowded) {
-  x_range_constrained <- c(min(tbl_xy$x1), max(tbl_xy$x2))
-  
-  # make distance between centers large enough
-  min_distance <- 0
-  while(min_distance < 5){
-    x_centers <- sample(
-      seq(x_range_constrained[1], x_range_constrained[2], by = 1), n_centers*2, replace = FALSE
-    )
-    grps <- rep(seq(1, length(x_centers)/2, by = 1), each = 2)
-    n_grps <- max(grps)
-    l_centers <- split(x_centers, grps)
-    dist_eucl <- function(a, b, l) sqrt((l[[a]][1] - l[[b]][1])^2 + (l[[a]][2] - l[[b]][2])^2)
-    cross_centers <- crossing(a = 1:length(l_centers), b = 1:length(l_centers))
-    distances <- unlist(pmap(cross_centers, dist_eucl, l_centers))
-    distances <- distances[distances != 0]
-    min_distance <- min(distances)
-  }
-  print(l_centers)
-  n_crowded <- round(n_train * p_crowded)
-  unevens <- n_crowded %% n_grps
-  n_crowded <- n_crowded + (n_grps - unevens)
-  n_sparse <- n_train - n_crowded
-  x_crowded <- map(
-    l_centers, mvrnorm, n = n_crowded / n_grps, Sigma = matrix(c(.75, 0, 0, .75), ncol = 2)
-  ) %>% reduce(rbind)
-  x_sparse <- cbind(
-    runif(n_sparse, x_range_constrained[1], x_range_constrained[2]),
-    runif(n_sparse, x_range_constrained[1], x_range_constrained[2])
-  )
-  m_xy_train <- rbind(x_crowded, x_sparse)
-  colnames(m_xy_train) <- c("x1", "x2")
-  tbl_xy_train <- as_tibble(m_xy_train)
-  tbl_xy_train$crowding <- factor(c(rep("crowded", n_crowded), rep("sparse", n_sparse)))
-  return(tbl_xy_train)
-}
-
-
-plot_xy <- function(tbl) {
-  ggplot(tbl, aes(x1, x2)) +
-    geom_tile(aes(fill = y)) +
-    geom_text(aes(label = round(y, 1)), color = "white") +
-    scale_fill_viridis_c() +
-    theme_bw() +
-    labs(
-      x = expression(X["1"]),
-      y = expression(X["2"])
-    )
-}
-
-plot_x_train <- function(tbl) {
-  ggplot(tbl, aes(x1, x2, group = crowding)) +
-    geom_point(aes(color = crowding)) +
-    scale_color_brewer(palette = "Set1") +
-    theme_bw() +
-    labs(
-      x = expression(X["1"]),
-      y = expression(X["2"])
-    )
-}
-
-
-space_and_exemplars <- function(smoothness, seed, l_info, fn) {
-  tbl_xy <- xy_space(fn, smoothness, l_info[["x_range"]], seed)
-  tbl_xy_train <- xy_sample(tbl_xy, l_info[["n_train"]], l_info[["n_center"]], l_info[["p_crowded"]])
-  tbl_xy_train$y <- fn(tbl_xy_train, 2, smoothness)
-  tbl_xy_train$smoothness <- smoothness
-  return(list(tbl_xy, tbl_xy_train))
-}
 
 
 x_range <- c(0L, 15L)
@@ -123,19 +34,6 @@ tbl_space <- reduce(map(l_smooth, 1), rbind)
 tbl_xy_train <- reduce(map(l_smooth, 2), rbind)
 plot_xy(tbl_space) + facet_wrap(~ smoothness)
 plot_x_train(tbl_xy_train) + facet_wrap(~ smoothness)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
