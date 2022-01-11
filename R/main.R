@@ -39,23 +39,26 @@ xy_sample <- function(tbl_xy, n_train, n_centers, p_crowded) {
   
   # make distance between centers large enough
   min_distance <- 0
-  while(min_distance > 5){
+  while(min_distance < 5){
     x_centers <- sample(
       seq(x_range_constrained[1], x_range_constrained[2], by = 1), n_centers*2, replace = FALSE
     )
-    groups <- rep(seq(1, length(x_centers)/2, by = 1), each = 2)
-    n_groups <- max(groups)
-    l_centers <- split(x_centers, groups)
+    grps <- rep(seq(1, length(x_centers)/2, by = 1), each = 2)
+    n_grps <- max(grps)
+    l_centers <- split(x_centers, grps)
     dist_eucl <- function(a, b, l) sqrt((l[[a]][1] - l[[b]][1])^2 + (l[[a]][2] - l[[b]][2])^2)
     cross_centers <- crossing(a = 1:length(l_centers), b = 1:length(l_centers))
-    min_distance <- min(unlist(pmap(cross_centers, dist_eucl, l_centers)))
+    distances <- unlist(pmap(cross_centers, dist_eucl, l_centers))
+    distances <- distances[distances != 0]
+    min_distance <- min(distances)
   }
+  print(l_centers)
   n_crowded <- round(n_train * p_crowded)
-  unevens <- n_crowded %% n_groups
-  n_crowded <- n_crowded + (n_groups - unevens)
+  unevens <- n_crowded %% n_grps
+  n_crowded <- n_crowded + (n_grps - unevens)
   n_sparse <- n_train - n_crowded
   x_crowded <- map(
-    l_centers, mvrnorm, n = n_crowded / n_groups, Sigma = matrix(c(1, 0, 0, 1), ncol = 2)
+    l_centers, mvrnorm, n = n_crowded / n_grps, Sigma = matrix(c(.75, 0, 0, .75), ncol = 2)
   ) %>% reduce(rbind)
   x_sparse <- cbind(
     runif(n_sparse, x_range_constrained[1], x_range_constrained[2]),
@@ -92,16 +95,6 @@ plot_x_train <- function(tbl) {
     )
 }
 
-x_range <- c(0L, 15L)
-n_train <- 80
-n_centers <- 3
-n_smoothness <- 2
-p_crowded <- .8
-l_info <- list(
-  "x_range" = x_range, "n_train" = n_train,
-  "n_center" = n_centers, "n_smoothness" = n_smoothness,
-  "p_crowded" = p_crowded
-)
 
 space_and_exemplars <- function(smoothness, seed, l_info, fn) {
   tbl_xy <- xy_space(fn, smoothness, l_info[["x_range"]], seed)
@@ -111,7 +104,21 @@ space_and_exemplars <- function(smoothness, seed, l_info, fn) {
   return(list(tbl_xy, tbl_xy_train))
 }
 
-l_smooth <- map(c("smooth", "rough"), space_and_exemplars, seed = 1423, l_info = l_info, fn = fn_sin)
+
+x_range <- c(0L, 15L)
+n_train <- 80
+n_centers <- 4
+n_smoothness <- 2
+p_crowded <- .8
+l_info <- list(
+  "x_range" = x_range, "n_train" = n_train,
+  "n_center" = n_centers, "n_smoothness" = n_smoothness,
+  "p_crowded" = p_crowded
+)
+
+
+
+l_smooth <- map(c("smooth", "rough"), space_and_exemplars, seed = 7323, l_info = l_info, fn = fn_sin)
 tbl_space <- reduce(map(l_smooth, 1), rbind)
 tbl_xy_train <- reduce(map(l_smooth, 2), rbind)
 plot_xy(tbl_space) + facet_wrap(~ smoothness)
