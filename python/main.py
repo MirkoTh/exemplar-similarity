@@ -32,15 +32,18 @@ def fit_gp(df: pd.DataFrame, i_vars: list, d_var: str) -> dict:
     m_gp.fit(df[i_vars], df[d_var])
     dict_results = {
         "length_scale": m_gp.kernel_.length_scale,
-        "x_mean": m_scale.mean_,
-        "x_sd": m_scale.scale_,
+        "x_mean": list(m_scale.mean_),
+        "x_sd": list(m_scale.scale_),
     }
     return dict_results
 
 
-sys.path.append("../../")
+print("loading the .json data")
+sys.path.append("..")
 
-with open("data/l-data-train.json", "rb") as f:
+folder_location = "data/"
+file_name_in = "l-data-train.json"
+with open(folder_location + file_name_in, "rb") as f:
     dict_data_train = json.load(f)
 
 l_dfs_train = list()
@@ -50,10 +53,13 @@ df = l_dfs_train[1]
 i_vars = ["x1", "x2"]
 d_var = ["y"]
 fit_gp_partial = partial(fit_gp, i_vars=i_vars, d_var=d_var)
+print("fitting the models...")
 l_models = list(map(fit_gp_partial, l_dfs_train))
 
-folder_location = "data/"
-file_name = "model-params.pickle"
+print("... is over now")
+file_name_out = "model-params.json"
 
-with open(folder_location + file_name, "wb") as f:
-    pickle.dump(l_models, f)
+with open(folder_location + file_name_out, "w") as f:
+    json.dump(l_models, f)
+
+print(f"""wrote back the results to {folder_location + file_name_out}""")
