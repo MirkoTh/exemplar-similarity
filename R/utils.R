@@ -103,8 +103,16 @@ space_and_exemplars <- function(smoothness, seed, l_info, fn) {
 }
 
 
-distance_rbf <- function(i, df_x, N, lambda, sigma){
-  m <- matrix(unlist(rep(df_x[i, ], N)), N, 2, byrow = TRUE)
+distance_rbf <- function(i, tbl_x, N, lambda, sigma){
+  #' @description 2d rbf distance function
+  #' returns similarity of one datapoint from a tbl with all datapoint from that tbl
+  #' @param tbl_x tbl with x values to be evaluated
+  #' @param N nr of exemplars
+  #' @param lambda length scale of RBF kernel
+  #' @param sigma sigma parameter of RBF kernel
+  #' @return tbl with similarities
+  #'
+  m <- matrix(unlist(rep(tbl_x[i, ], N)), N, 2, byrow = TRUE)
   colnames(m) <- c("x_1", "x_2")
   tbl_single <- as_tibble(m)
   tbl_single["sim"] <- - (sqrt(
@@ -115,6 +123,13 @@ distance_rbf <- function(i, df_x, N, lambda, sigma){
 }
 
 similarity_rbf <- function(lambda, sigma, tbl_x, N){
+  #' @description calculate rbf similarity matrix
+  #' @param lambda length scale of RBF kernel
+  #' @param sigma sigma parameter of RBF kernel
+  #' @param tbl_x tbl with all x pairs (2D)
+  #' @param N nr of data points
+  #' @return tbl with similarities
+  #'
   l <- map(1:N, distance_rbf, tbl_x, N, lambda, sigma)
   m <- matrix(unlist(l), N, N, byrow = TRUE)
   colnames(m) <- str_c("x_", 1:N)
