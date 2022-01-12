@@ -14,7 +14,7 @@ walk(l, source)
 # CHECK 1.1 create regions with high density and low density of training points
 # 
 # CHECK fit the gp model in both conditions
-# 3. evaluate the kernel function for the intended test points
+# CHECK evaluate the kernel function for the intended test points
 # 4. feed the summed similarity measure into the linear ba model
 # 5. manually play around with the other parameters to achieve reasonable predictions
 
@@ -39,7 +39,8 @@ l_info <- list(
   "p_crowded_train" = p_crowded_train,
   "p_crowded_test" = p_crowded_test
 )
-
+i_vars <- c("x1", "x2")
+d_var <- "y"
 
 
 # Simulate Data From Conditions -------------------------------------------
@@ -62,8 +63,8 @@ l_tbl_xy_test <- split(tbl_xy_test, ~ smoothness)
 
 # overview plots
 plot_xy(tbl_space) + facet_wrap(~ smoothness)
-plot_x_train(tbl_xy_train) + facet_wrap(~ smoothness)
-plot_x_train(tbl_xy_test) + facet_wrap(~ smoothness)
+plot_x(tbl_xy_train) + facet_wrap(~ smoothness)
+plot_x(tbl_xy_test) + facet_wrap(~ smoothness)
 
 # save experimental data here that can be loaded from within python
 write_json(l_tbl_xy_train, "data/l-data-train.json")
@@ -77,25 +78,21 @@ shell.exec("python\\run-python.bat")
 Sys.sleep(5)
 
 
-
 # Import Fitted Parameters from Python ------------------------------------
 
+## this again can be iterated over...
+tbl <- rbind(l_tbl_xy_test[[1]], l_tbl_xy_train[[1]])
 
 l_params_fitted <- read_json("data/model-params.json")
 names(l_params_fitted) <- smooth_vals
-
-
-x_1 <- seq(1, 12)
-x_2 <- x_1
-
-tbl_x <- crossing(
-  x_1, x_2
+N <- nrow(tbl)
+tbl_sim_rbf <- similarity_rbf(l_params_fitted[["rough"]]$length_scale, 1, tbl, N)
+sims_test <- rowSums(
+  tbl_sim_rbf[
+    1:l_info[["n_test"]], 
+    (l_info[["n_test"]]+1):(l_info[["n_test"]]+l_info[["n_train"]])
+  ]
 )
-
-N <- nrow(tbl_x)
-
-tbl_sim_rbf <- similarity_rbf(2, 1, tbl_x, N)
-
 cols <- colnames(tbl_sim_rbf)
 tbl_sim_rbf$var2 <- cols
 

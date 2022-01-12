@@ -11,7 +11,7 @@ plot_xy <- function(tbl) {
     )
 }
 
-plot_x_train <- function(tbl) {
+plot_x <- function(tbl) {
   ggplot(tbl, aes(x1, x2, group = crowding)) +
     geom_point(aes(color = crowding)) +
     scale_color_brewer(palette = "Set1") +

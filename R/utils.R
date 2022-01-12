@@ -113,11 +113,11 @@ distance_rbf <- function(i, tbl_x, N, lambda, sigma){
   #' @return tbl with similarities
   #'
   m <- matrix(unlist(rep(tbl_x[i, ], N)), N, 2, byrow = TRUE)
-  colnames(m) <- c("x_1", "x_2")
+  colnames(m) <- c("x1", "x2")
   tbl_single <- as_tibble(m)
   tbl_single["sim"] <- - (sqrt(
-    (tbl_single$x_1 - tbl_x$x_1)^2 +
-      (tbl_single$x_2 - tbl_x$x_2)^2
+    (tbl_single$x1 - tbl_x$x1)^2 +
+      (tbl_single$x2 - tbl_x$x2)^2
   )^2) / (2*lambda^2)
   return (tbl_single$sim)
 }
@@ -132,7 +132,7 @@ similarity_rbf <- function(lambda, sigma, tbl_x, N){
   #'
   l <- map(1:N, distance_rbf, tbl_x, N, lambda, sigma)
   m <- matrix(unlist(l), N, N, byrow = TRUE)
-  colnames(m) <- str_c("x_", 1:N)
+  colnames(m) <- str_c("x", 1:N)
   tbl <- as_tibble(sigma^2 * exp(m))
   return (tbl)
 }
