@@ -21,3 +21,17 @@ plot_x <- function(tbl) {
       y = expression(X["2"])
     )
 }
+
+plot_xy_x <- function(tbl_base, tbl_new) {
+  ggplot() +
+    geom_tile(data = tbl_base, aes(x1, x2, fill = y), alpha = .25) +
+    geom_point(data = tbl_new, aes(x1, x2, color = crowding)) +
+    geom_density_2d(data = tbl_new, aes(x1, x2), alpha = .25) +
+    scale_color_brewer(palette = "Set1") +
+    scale_fill_viridis_c() +
+    theme_bw() +
+    labs(
+      x = expression(X["1"]),
+      y = expression(X["2"])
+    )
+}
