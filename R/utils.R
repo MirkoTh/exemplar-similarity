@@ -94,7 +94,6 @@ space_and_exemplars <- function(smoothness, seed, l_info, fn) {
   l_centers <- l_train[[2]]
   tbl_xy_train$y <- fn(tbl_xy_train, 2, smoothness)
   tbl_xy_train$smoothness <- smoothness
-  print(l_centers)
   l_test <- xy_sample(tbl_xy, l_info[["n_test"]], l_info[["n_center"]], l_info[["p_crowded_test"]], l_centers)
   tbl_xy_test <- l_test[[1]]
   tbl_xy_test$y <- fn(tbl_xy_test, 2, smoothness)

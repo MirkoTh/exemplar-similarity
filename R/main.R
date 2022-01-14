@@ -4,6 +4,7 @@
 library(tidyverse)
 library(docstring)
 library(MASS)
+library(jsonlite)
 
 
 l <- c("R/utils.R", "R/plotting.R")
@@ -27,7 +28,7 @@ walk(l, source)
 x_range <- c(0L, 15L)
 n_train <- 100
 n_test <- 100
-n_centers <- 4
+n_centers <- 2
 n_smoothness <- 2
 p_crowded_train <- .8
 p_crowded_test <- .5
@@ -63,8 +64,13 @@ l_tbl_xy_test <- split(tbl_xy_test, ~ smoothness)
 
 # overview plots
 plot_xy(tbl_space) + facet_wrap(~ smoothness)
+
 plot_x(tbl_xy_train) + facet_wrap(~ smoothness)
 plot_x(tbl_xy_test) + facet_wrap(~ smoothness)
+
+plot_xy_x(tbl_space, tbl_xy_train) + facet_wrap(~ smoothness)
+plot_xy_x(tbl_space, tbl_xy_test) + facet_wrap(~ smoothness)
+
 
 # save experimental data here that can be loaded from within python
 write_json(l_tbl_xy_train, "data/l-data-train.json")
@@ -75,31 +81,50 @@ write_json(l_tbl_xy_train, "data/l-data-train.json")
 
 
 shell.exec("python\\run-python.bat")
-Sys.sleep(5)
+#Sys.sleep(20)
 
 
 # Import Fitted Parameters from Python ------------------------------------
 
 ## this again can be iterated over...
-tbl <- rbind(l_tbl_xy_test[[1]], l_tbl_xy_train[[1]])
-
 l_params_fitted <- read_json("data/model-params.json")
 names(l_params_fitted) <- smooth_vals
-N <- nrow(tbl)
-tbl_sim_rbf <- similarity_rbf(l_params_fitted[["rough"]]$length_scale, 1, tbl, N)
-sims_test <- rowSums(
-  tbl_sim_rbf[
-    1:l_info[["n_test"]], 
-    (l_info[["n_test"]]+1):(l_info[["n_test"]]+l_info[["n_train"]])
-  ]
+
+
+l_sims <- pmap(
+  list(l_tbl_xy_test, l_tbl_xy_train, l_params_fitted),
+  similarity_test_to_train,
+  l_info
 )
-cols <- colnames(tbl_sim_rbf)
-tbl_sim_rbf$var2 <- cols
 
 
-tbl_sim_rbf %>% pivot_longer(cols = all_of(cols)) %>%
-  mutate(var2 = factor(var2, levels = cols),
-         name = factor(name, levels = cols)) %>%
-  ggplot() +
+# exemplary plot of similarities between all data points (train & test)
+
+tbl_both <- similarities_to_tbl(l_sims)
+
+ggplot(tbl_both) +
   geom_tile(aes(name, var2, color=value)) +
-  scale_color_viridis_c()
+  scale_color_viridis_c(name = "Similarity") +
+  theme_bw() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank()
+    ) + facet_wrap(~ Smoothness)
+
+l_tbl_xy_test$rough$sim_to_train <- l_sims[[1]][[1]]
+l_tbl_xy_test$smooth$sim_to_train <- l_sims[[2]][[1]]
+tbl_xy_test$sim_to_train <- c(l_sims[[1]][[1]], l_sims[[2]][[1]])
+ggplot(tbl_xy_test, aes(sim_to_train, group = crowding)) +
+  geom_histogram(aes(fill = crowding)) +
+  facet_wrap(~ smoothness) +
+  scale_fill_brewer(name = "Crowding", palette = "Set1") +
+  theme_bw() +
+  labs(
+    x = "Similarity",
+    y = "Counts"
+  )
+
+
+
+
+
