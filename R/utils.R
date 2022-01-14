@@ -138,3 +138,52 @@ similarity_rbf <- function(lambda, sigma, tbl_x, N){
   tbl <- as_tibble(sigma^2 * exp(m))
   return (tbl)
 }
+
+
+similarity_test_to_train <- function(tbl_test, tbl_train, params, l_info, kernel = "rbf"){
+  #' @description wrapper function calculating similarities of x test to x train
+  #' using fitted kernel parameter(-s)
+  #' @param tbl_test tbl with xy test
+  #' @param tbl_train tbl with xy train
+  #' @param params fitted kernel parameters
+  #' @param l_info simulation parameters
+  #' @param kernel kernel used in fitting the data; default to "rbf"
+  #' @return list with vector of test-train similarities and tbl with full similarity matrix
+  #'
+  tbl <- rbind(tbl_test, tbl_train)
+  N <- nrow(tbl)
+  tbl_sim_rbf <- similarity_rbf(params$length_scale, 1, tbl, N)
+  sims_test <- rowSums(
+    tbl_sim_rbf[
+      1:l_info[["n_test"]], 
+      (l_info[["n_test"]]+1):(l_info[["n_test"]]+l_info[["n_train"]])
+    ]
+  )
+  return(list(sims_test, tbl_sim_rbf))
+}
+
+
+similarities_to_tbl <- function(l_sims) {
+  #' @description concatenate similarites across smoothness conditions into long tbl
+  #' @param l_sims list with full similarity matrices in second list entry
+  #' @return long tbl
+  #'
+  tbl_sim_rbf_rough <- l_sims[[1]][[2]]
+  tbl_sim_rbf_smooth <- l_sims[[2]][[2]]
+  cols <- colnames(tbl_sim_rbf_rough)
+  tbl_sim_rbf_rough$var2 <- cols
+  tbl_sim_rbf_smooth$var2 <- cols
+  
+  tbl_rough_long <- tbl_sim_rbf_rough %>% 
+    pivot_longer(cols = all_of(cols)) %>%
+    mutate(var2 = factor(var2, levels = cols),
+           name = factor(name, levels = cols),
+           Smoothness = "Rough")
+  tbl_smooth_long <- tbl_sim_rbf_smooth %>% 
+    pivot_longer(cols = all_of(cols)) %>%
+    mutate(var2 = factor(var2, levels = cols),
+           name = factor(name, levels = cols),
+           Smoothness = "Smooth")
+  tbl_both <- rbind(tbl_rough_long, tbl_smooth_long)
+  return(tbl_both)
+}
