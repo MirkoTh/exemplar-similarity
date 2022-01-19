@@ -5,9 +5,11 @@ library(tidyverse)
 library(docstring)
 library(MASS)
 library(jsonlite)
+library(gridExtra)
+library(rutils)
 
 
-l <- c("R/utils.R", "R/plotting.R")
+l <- str_c("R/", c("utils", "plotting", "lba-math_mt", "pq-lba_mt"), ".R")
 walk(l, source)
 
 # todos
@@ -73,7 +75,14 @@ plot_xy_x(tbl_space, tbl_xy_test) + facet_wrap(~ smoothness)
 
 
 # save experimental data here that can be loaded from within python
-write_json(l_tbl_xy_train, "data/l-data-train.json")
+withCallingHandlers(
+  warning = function(cnd) {
+    dir.create("data/")
+    write_json(l_tbl_xy_train, "data/l-data-train.json")
+  },
+  write_json(l_tbl_xy_train, "data/l-data-train.json")
+)
+
 
 
 
@@ -109,12 +118,12 @@ ggplot(tbl_both) +
   theme(
     axis.text = element_blank(),
     axis.title = element_blank()
-    ) + facet_wrap(~ Smoothness)
+  ) + facet_wrap(~ Smoothness)
 
 l_tbl_xy_test$rough$sim_to_train <- l_sims[[1]][[1]]
 l_tbl_xy_test$smooth$sim_to_train <- l_sims[[2]][[1]]
 tbl_xy_test$sim_to_train <- c(l_sims[[1]][[1]], l_sims[[2]][[1]])
-ggplot(tbl_xy_test, aes(sim_to_train, group = crowding)) +
+ggplot(tbl_xy_test, aes(sim_to_train_scaled, group = crowding)) +
   geom_histogram(aes(fill = crowding)) +
   facet_wrap(~ smoothness) +
   scale_fill_brewer(name = "Crowding", palette = "Set1") +
@@ -124,7 +133,83 @@ ggplot(tbl_xy_test, aes(sim_to_train, group = crowding)) +
     y = "Counts"
   )
 
+# scale the similarities between 0 and 1
+# "2" could be made a model parameter to be estimated
+tbl_xy_test$sim_to_train_scaled <- .5 + (tbl_xy_test$sim_to_train / l_info$n_test)
+tbl_lba <- tbl_xy_test %>%
+  group_by(smoothness, crowding) %>%
+  summarize(
+    drift = mean(sim_to_train_scaled),
+    sdI = sd(sim_to_train_scaled) / .5
+  ) %>% ungroup()
 
+n1CDF_partial <- function(drift, sdI) {
+  n1CDF(seq(.1, 2.5, by = .1), .35, .6, c(drift, 1 - drift), c(sdI, sdI))
+}
+n1PDF_partial <- function(drift, sdI) {
+  n1PDF(seq(.1, 2.5, by = .1), .35, .6, c(drift, 1 - drift), c(sdI, sdI))
+}
 
+l_cdf <- tbl_lba %>% dplyr::select(drift, sdI) %>%
+  pmap(n1CDF_partial)
+l_pdf <- tbl_lba %>% dplyr::select(drift, sdI) %>%
+  pmap(n1PDF_partial)
 
+tbl_preds <- function(smoothness, crowding, pdf, cdf) {
+  tibble(
+    smoothness = smoothness,
+    crowding = crowding,
+    t = seq(.1, 2.5, by = .1),
+    pdf = pdf,
+    cdf = cdf
+  )
+}
 
+l_preds <- pmap(
+  list(tbl_lba$smoothness, tbl_lba$crowding, l_pdf, l_cdf),
+  tbl_preds
+)
+
+plot_rt_hist <- function(tbl) {
+  tbl_rt <- tbl %>% 
+    mutate(
+      t_weighted = (t * pdf) / sum(pdf)
+    ) %>%
+    summarize(
+      x_pos = mean(t) + .7 * sd(t),
+      y_pos = max(pdf) / 2,
+      rt_mean = round(sum(t_weighted), 2),
+      p_response = round(max(cdf), 2)
+    )
+  title <- str_c(
+    str_to_title(tbl$smoothness[1]), " & ", 
+    str_to_title(tbl$crowding[1])
+  )
+  ggplot() +
+    geom_col(data = tbl, aes(t, pdf), fill = "white", color = "black") +
+    geom_text(data = tbl_rt, aes(
+      x_pos, y_pos, label = str_c(
+        "Mean RT = ", rt_mean, "\np Response = ", p_response
+      )
+    )
+    ) +
+    theme_bw() +
+    labs(
+      x = "Time (s)",
+      y = "PDF",
+      title = title
+    )
+}
+l_rt_hist_plots <- map(l_preds, plot_rt_hist)
+
+plot_arrangement(l_rt_hist_plots)
+
+# logistic could be used as scaling instead. but creates non-normal distribution 
+# of similarity values, which would not fit well with lba assumptions
+# 
+# logistic <- function(df, intercept, beta) {
+#   1 / (1 + exp(-beta * (df$sim_to_train - intercept)))
+# }
+# 
+# hist(logistic(tbl_xy_test, 20, .1))
+# logistic(tbl_xy_test, 20, .1) %>% sort(decreasing = TRUE)
