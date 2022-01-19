@@ -35,3 +35,14 @@ plot_xy_x <- function(tbl_base, tbl_new) {
       y = expression(X["2"])
     )
 }
+
+
+plot_arrangement <- function(pl, n_cols = 2) {
+  #' plot a list of plots on one page
+  #' 
+  #' @param pl all the ggplots
+  #' @param n_cols nr columns of the page layout
+  n_plots <- length(pl)
+  n_rows <- ceiling(n_plots / n_cols)
+  marrangeGrob(pl, nrow = n_rows, ncol = n_cols)
+}
